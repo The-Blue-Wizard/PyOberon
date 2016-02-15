@@ -58,12 +58,12 @@ Although I have yet to fully flesh it out for the purpose of collaboration, I ne
 
 1. **NO TABS** for indentation. Use spaces **ONLY**!!! And each indentation should be 4 spaces.
 2. Certain Python files will have the original Oberon code in comments, to aid in translation. Those source lines are rather special, and so shall follow the following rules:
-   2a. Each such line shall be marked with \# \# (two hashes..these are easily generated in Notepad++ using `ctrl-K`)
-   2b. These lines are to be indented independently of the actual Python code so that if one remove all Python codes and standard comments (those starting with a single hash), they would be properly indented. Note that unlike the original Oberon code, all these indentations are made using 4 spaces rule.
+   1. Each such line shall be marked with \# \# (two hashes..these are easily generated in Notepad++ using `ctrl-K`)
+   2. These lines are to be indented independently of the actual Python code so that if one remove all Python codes and standard comments (those starting with a single hash), they would be properly indented. Note that unlike the original Oberon code, all these indentations are made using 4 spaces rule.
 3. Although I know I don't always follow that rule here (yet), but each part (like classes, functions, whatever), if complicated enough, should be annotated.
 4. The coding should be clear. Cutesy early 80s short spelling such as `mno' are to be strongly discouraged!!!! They make code reading harder to figure out. Of course everything is in flux as I am continually translating the code, so I will be tolerant of that for a while...
 
-Note that rule 2b is possible thanks to Python's liberal acceptance of comments being placed regardless of indentations (thanks Guido! :-))
+Note that rule 2ii is possible thanks to Python's liberal acceptance of comments being placed regardless of indentations (thanks Guido! :-))
 
 ## Bugs
 
