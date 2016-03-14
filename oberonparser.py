@@ -1,6 +1,6 @@
 #!/bin/python
 
-# PyOberon 0.1 - Oberon 07 compiler (re-)written in Python
+# PyOberon 0.1.1 - Oberon 07 compiler (re-)written in Python
 # Copyright (C) 2016  John "The Blue Wizard" Rogers
 
 # This program is free software: you can redistribute it and/or modify
@@ -24,7 +24,7 @@
 # It uses scanner.py to get symbols, and it uses yacc from PLY to parse them. The
 # output is an AST. Note that unlike ORP, it does not do any type checking, nor
 # generate code. that is being done by modules analyzer.py, optimizer.py and
-# codegen/py.
+# codegen.py.
 
 # see http://www.cs.may.ie/~jpower/Oberon/oberon.y (it's for Oberon-2 though)
 
@@ -36,11 +36,11 @@ import scanner
 tokens = scanner.tokens
 
 precedence = (
-               ('nonassoc', 'EQ', 'NE', 'LT', 'LE', 'GT', 'GE', 'IN', 'IS'),
-               ('left',  'PLUS', 'MINUS', 'OR'),
-               ('right', 'UPLUS', 'UMINUS'),
-               ('left',  'STAR', 'SLASH', 'DIV', 'MOD', 'AND'),
-               ('right', 'TILDE')
+        ('nonassoc', 'EQ', 'NE', 'LT', 'LE', 'GT', 'GE', 'IN', 'IS'),
+        ('left',  'PLUS', 'MINUS', 'OR'),
+        ('right', 'UPLUS', 'UMINUS'),
+        ('left',  'STAR', 'SLASH', 'DIV', 'MOD', 'AND'),
+        ('right', 'TILDE')
 )
 
 # support routines
@@ -173,10 +173,14 @@ def p_structure_type_3(p):
 
 # array type
 
-# Note: The analyzer will expand "ARRAY n1, n2,
+# Note: The optimizer will expand "ARRAY n1, n2,
 # ..., nk OF not_array_type" into "ARRAY n1 OF
 # ARRAY n2 OF ... ARRAY nk OF not_array_type"
-# and create appropriate AST.
+# and create appropriate AST. I elected to not
+# do that in analyzer.py, so analyzer can return
+# a fully validated, typed AST that faithfully
+# capture the structure as is, for future trans-
+# formation by a utility.
 
 def p_array_type_0(p):
     '''array_type : ARRAY constant_expr_list OF type'''
@@ -261,7 +265,7 @@ def p_formal_parameters_opt_1(p):
 
 def p_formal_parameters_0(p):
     '''formal_parameters : LPAREN FP_list_opt RPAREN COLON qualident'''
-    p[0] = [p[2], p[4]]
+    p[0] = [p[2], p[5]]
 
 def p_formal_parameters_1(p):
     '''formal_parameters : LPAREN FP_list_opt RPAREN'''
@@ -285,7 +289,7 @@ def p_FP_list_1(p):
 
 def p_formal_param(p):
     '''formal_param : VAR_opt fp_ident_list COLON formal_type'''
-    p[0] = [p[2], p[1], p[3]]
+    p[0] = [p[2], p[1], p[4]]
 
 def p_VAR_opt_0(p):
     '''VAR_opt : VAR'''
@@ -307,17 +311,29 @@ def p_fp_ident(p):
     '''fp_ident : ident'''
     p[0] = p[1]
 
-def p_formal_type(p):
-    '''formal_type : array_of_list qualident'''
-    p[0] = [p[2], p[1]]
+# Note: Contrary to Oberon 07 Report (revised???) which states in
+# section 10.1 that the formal types is just "{ARRAY OF} qualident",
+# GRAPHICS.MOD does use PROCEDURE type. This code follows what's
+# found in ORP.MOD, which turned out to be just one more type added.
 
-def p_array_of_list_0(p):
-    '''array_of_list : array_of_list ARRAY OF'''
-    p[0] = p[1]+1
+def p_formal_type_0(p):
+    '''formal_type : qualident'''
+    p[0] = ['QUALIDENT', p[1]]
 
-def p_array_of_list_1(p):
-    '''array_of_list : '''
-    p[0] = 0
+def p_formal_type_1(p):
+    '''formal_type : ARRAY OF formal_type'''
+    count = 0
+    if p[3][0] == 'ARRAY':
+        count = p[3][1]
+        type = p[3][2]
+    else:
+        count = 0
+        type = p[3]
+    p[0] = ['ARRAY', count+1, type]
+
+def p_formal_type_2(p):
+    '''formal_type : procedure_type'''
+    p[0] = p[1]
 
 #### variables
 
@@ -457,21 +473,9 @@ def p_assignment(p):
 
 # procedure call
 
-def p_procedure_call_0(p):
-    '''procedure_call : designator actual_parameters'''
-    p[0] = ['CALL', p[1], p[2]]
-
-def p_procedure_call_1(p):
+def p_procedure_call(p):
     '''procedure_call : designator'''
-    p[0] = ['CALL', p[1], None]
-
-def p_actual_parameters_0(p):
-    '''actual_parameters : LPAREN expr_list RPAREN'''
-    p[0] = p[2]
-
-def p_actual_parameters_1(p):
-    '''actual_parameters : LPAREN RPAREN'''
-    p[0] = [None]
+    p[0] = ['CALL', p[1]]
 
 # if statement
 
@@ -544,7 +548,7 @@ def p_label_1(p):
     p[0] = p[1]
 
 def p_label_2(p):
-    '''label : ID'''
+    '''label : qualident'''
     p[0] = p[1]
 
 # while statement
@@ -574,7 +578,10 @@ def p_repeat_statement(p):
 # for statement
 
 def p_for_statement(p):
-    '''for_statement : FOR ident BECOMES expr TO expr by_opt DO statement_sequence END'''
+    '''for_statement : FOR qualident BECOMES expr TO expr by_opt DO statement_sequence END'''
+    # was: '''for_statement : FOR ident BECOMES expr TO expr by_opt DO statement_sequence END'''
+    # Note: According to the grammar, it should be an 'ident', but ORP.Mod treats the
+    # FOR variable as a qualident. So I elect to code it accordingly.
     p[0] = ['FOR', p[2], p[4], p[6], p[7], p[8]]
 
 def p_by_opt_0(p):
@@ -702,20 +709,14 @@ def p_expr_26(p):
     p[0] = p[1]
 
 def p_expr_27(p):
-    '''expr : designator actual_parameters'''
-    # the VARFUNCCALL tag is used instead of
-    # FUNCCALL to simplify the analysis a bit
-    p[0] = ['VARFUNCCALL', p[1], p[2]]
+    '''expr : designator'''
+    p[0] = p[1]
 
 def p_expr_28(p):
-    '''expr : designator'''
-    p[0] = ['VARFUNCCALL', p[1], None]
-
-def p_expr_29(p):
     '''expr : LPAREN expr RPAREN'''
     p[0] = p[2]
 
-def p_expr_30(p):
+def p_expr_29(p):
     '''expr : TILDE expr'''
     p[0] = ['NOT', p[2]]
 
@@ -748,7 +749,7 @@ def p_element_1(p):
 # parser can't tell whether the first ident is a module
 # ident, so I modify the designator so it just use
 # ident instead of qualident, and let the analyzer
-# fix it
+# fix it.
 
 def p_designator(p):
     '''designator : ident selector_list'''
@@ -779,13 +780,27 @@ def p_selector_2(p):
     '''selector : ARROW'''
     p[0] = ['ARROW']
 
-# parser can't tell between procedure/function call
-# and this, so I comment it out, and let the analyzer
-# fix it
+# parser can't tell between variable, procedure/function
+# call and typeguard by syntax alone, so the selector is
+# deliberately overgeneralized, and let the analyzer fix
+# it.
 
-# def p_selector_3(p):
+# hypothetical def p_selector_3(p):
     # '''selector : LPAREN qualident RPAREN'''
     # p[0] = ['TYPEGUARD', p[2]]
+
+# note that expr can include qualident via designator,
+# thus satisfying the TYPEGUARD syntactic construct.
+
+# this construct identifies it as PROCEDURE/FUNCTION call
+
+def p_selector_3(p):
+    '''selector : LPAREN expr_list RPAREN'''
+    p[0] = ['PARAMS', p[2]]
+
+def p_selector_4(p):
+    '''selector : LPAREN RPAREN'''
+    p[0] = ['PARAMS', None]
 
 # expr list
 
